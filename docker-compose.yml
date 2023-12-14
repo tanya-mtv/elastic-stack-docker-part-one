@@ -21,7 +21,7 @@ networks:
 
 services:
   setup:
-    image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
+    image: elasticsearch:${STACK_VERSION}
     volumes:
       - certs:/usr/share/elasticsearch/config/certs
     user: "0"
@@ -79,7 +79,7 @@ services:
     depends_on:
       setup:
         condition: service_healthy
-    image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
+    image: elasticsearch:${STACK_VERSION}
     labels:
       co.elastic.logs/module: elasticsearch
     volumes:
@@ -123,7 +123,7 @@ services:
     depends_on:
       es01:
         condition: service_healthy
-    image: docker.elastic.co/kibana/kibana:${STACK_VERSION}
+    image: kibana:${STACK_VERSION}
     labels:
       co.elastic.logs/module: kibana
     volumes:
@@ -157,7 +157,7 @@ services:
         condition: service_healthy
       kibana:
         condition: service_healthy
-    image: docker.elastic.co/beats/metricbeat:${STACK_VERSION}
+    image: elastic/metricbeat:${STACK_VERSION}
     user: root
     volumes:
       - certs:/usr/share/metricbeat/certs
@@ -173,14 +173,13 @@ services:
       - ELASTIC_HOSTS=https://es01:9200
       - KIBANA_HOSTS=http://kibana:5601
       - LOGSTASH_HOSTS=http://logstash01:9600
-    command:
-      - strict.perms=false
+    command: ["--strict.perms=false"]
 
   filebeat01:
     depends_on:
       es01:
         condition: service_healthy
-    image: docker.elastic.co/beats/filebeat:${STACK_VERSION}
+    image: elastic/filebeat:${STACK_VERSION}
     user: root
     volumes:
       - certs:/usr/share/filebeat/certs
@@ -195,28 +194,73 @@ services:
       - ELASTIC_HOSTS=https://es01:9200
       - KIBANA_HOSTS=http://kibana:5601
       - LOGSTASH_HOSTS=http://logstash01:9600
-    command:
-      - strict.perms=false
+    command: ["--strict.perms=false"]
 
+  # logstash01:
+  #   depends_on:
+  #     es01:
+  #       condition: service_healthy
+  #     kibana:
+  #       condition: service_healthy
+  #   image: logstash:${STACK_VERSION}
+  #   labels:
+  #     co.elastic.logs/module: logstash
+  #   user: root
+  #   volumes:
+  #     - certs:/usr/share/logstash/certs
+  #     - logstashdata01:/usr/share/logstash/data
+  #     - "./logstash_ingest_data/:/usr/share/logstash/ingest_data/"
+  #     - "./logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro"
+  #   environment:
+  #     - xpack.monitoring.enabled=false
+  #     - ELASTIC_USER=elastic
+  #     - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+  #     - ELASTIC_HOSTS=https://es01:9200
+  #   command: ["--strict.perms=false"]
+
+  # logstash01:
+  #   depends_on:
+  #     es01:
+  #       condition: service_healthy
+  #     kibana:
+  #       condition: service_healthy
+  #   image: logstash:${STACK_VERSION}
+  #   labels:
+  #     co.elastic.logs/module: logstash
+  #   command: logstash -f /etc/logstash/conf.d/logstash.conf
+  #   volumes:
+  #     - certs:/usr/share/logstash/certs
+  #     - logstashdata01:/usr/share/logstash/data
+  #     - "./logstash_ingest_data/:/usr/share/logstash/ingest_data/"
+  #     - "./logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro"
+  #   environment:
+  #     - LS_JAVA_OPTS=-Xmx256m -Xms256m
+  #     - xpack.monitoring.enabled=false
+  #     - ELASTIC_USER=elastic
+  #     - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+  #     - ELASTIC_HOSTS=https://es01:9200
+
+  # [2023-12-14Txx:xx:xx,...][ERROR][logstash.config.sourceloader] No configuration found in the configured sources
   logstash01:
     depends_on:
       es01:
         condition: service_healthy
       kibana:
         condition: service_healthy
-    image: docker.elastic.co/logstash/logstash:${STACK_VERSION}
+    image: logstash:${STACK_VERSION}
     labels:
       co.elastic.logs/module: logstash
-    user: root
+    command: logstash -f /etc/logstash/conf.d/logstash.conf
     volumes:
       - certs:/usr/share/logstash/certs
       - logstashdata01:/usr/share/logstash/data
       - "./logstash_ingest_data/:/usr/share/logstash/ingest_data/"
       - "./logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro"
     environment:
-      - xpack.monitoring.enabled=false
-      - ELASTIC_USER=elastic
-      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
-      - ELASTIC_HOSTS=https://es01:9200
-    command:
-      - strict.perms=false
+      LS_JAVA_OPTS: -Xms256m -Xmx256m
+      LOGSTASH_INTERNAL_PASSWORD: ${LOGSTASH_INTERNAL_PASSWORD:-}
+      xpack.monitoring.enabled: false
+      ELASTIC_USER: elastic
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD}
+      ELASTIC_HOSTS: https://es01:9200
+    # restart: unless-stopped
